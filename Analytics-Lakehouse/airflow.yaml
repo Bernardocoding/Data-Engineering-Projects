@@ -1,0 +1,74 @@
+x-airflow-common:
+  &airflow-common
+  build:
+    context: ./airflow 
+  environment:
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor # CeleryExecutor or KubernetesExecutor 
+    AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-db/airflow
+    AIRFLOW__CORE__TEST_CONNECTION: 'Enabled'
+    AIRFLOW__WEBSERVER__SECRET_KEY: "7Kdl0pEf4Rvu14oVxRAZf3FVu1tE5bVpsbpYv7dGspM"
+    AIRFLOW__WEBSERVER__EXPOSE_CONFIG: 'True'
+    AIRFLOW__SMTP__SMTP_HOST: mailhog
+    AIRFLOW__SMTP__SMTP_PORT: 1025
+    AIRFLOW__SMTP__SMTP_MAIL_FROM: airflow@example.com
+    AIRFLOW__SMTP__SMTP_STARTTLS: 'False'
+    AIRFLOW__SMTP__SMTP_SSL: 'False'
+    AIRFLOW__SMTP__SMTP_USER: ''
+    AIRFLOW__SMTP__SMTP_PASSWORD: ''
+ 
+  volumes:
+    - ./airflow/dags:/opt/airflow/dags
+  networks:
+      iceberg_net:
+
+services:
+  airflow-db:
+    container_name: airflow-db
+    image: postgres:15
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - airflow_db_data:/var/lib/postgresql/data
+    networks:
+      iceberg_net:
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow"]
+      interval: 5s
+      retries: 5
+
+  airflow-webserver:
+    container_name: airflow-webserver
+    <<: *airflow-common
+    ports:
+      - "8080:8080"
+    command: webserver
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-scheduler:
+    container_name: airflow-scheduler
+    <<: *airflow-common
+    command: scheduler
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-init:
+    container_name: airflow-init
+    <<: *airflow-common
+    command: >
+      bash -c 'airflow db init && airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@example.com && (airflow connections delete trino_default || true) && airflow connections add trino_default --conn-type trino --conn-host trino --conn-port 8443 --conn-login test --conn-password password --conn-schema iceberg --conn-extra "{\"protocol\": \"https\", \"verify\": false}"'
+    depends_on:
+      airflow-db:
+        condition: service_healthy
+
+volumes:
+  airflow_db_data:
+
+networks:
+  iceberg_net:
+    external: true
+    name: analytics-lakehouse_iceberg_net

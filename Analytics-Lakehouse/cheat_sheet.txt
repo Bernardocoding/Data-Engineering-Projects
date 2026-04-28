@@ -1,0 +1,35 @@
+To list the databases available in the default catalog, run the following command in a terminal:
+    docker exec -it spark-iceberg pyiceberg list
+
+To list the tables under a database:
+    docker exec -it spark-iceberg pyiceberg list {DATABASE_NAME}
+
+Finally, the following describes the users table:
+    docker exec -it spark-iceberg pyiceberg describe --entity=table {DATABASE_NAME}.{TABLE_NAME}
+
+Execting data loader from Postgres to Iceberg via docker exec
+    docker compose exec spark-iceberg /opt/spark/bin/spark-submit --jars /home/iceberg/pyspark/jars/postgresql-42.7.6.jar /home/iceberg/pyspark/scripts/postgres_loader.py
+
+Executing data loader  JSON-formatted PageView:
+    docker compose exec spark-iceberg /opt/spark/bin/spark-submit --jars /home/iceberg/pyspark/jars/hadoop-aws-3.3.4.jar,/home/iceberg/pyspark/jars/aws-java-sdk-bundle-1.11.1026.jar /home/iceberg/pyspark/scripts/minio_loader.py
+
+Executing bronze to silver loader :
+    docker-compose exec spark-iceberg bash -c "cd /home/iceberg && /opt/spark/bin/spark-submit --jars /home/iceberg/pyspark/jars/hadoop-aws-3.3.4.jar,/home/iceberg/pyspark/jars/aws-java-sdk-bundle-1.11.1026.jar,/home/iceberg/pyspark/jars/postgresql-42.7.6.jar /home/iceberg/pyspark/scripts/bronze_to_silver_transformer.py"
+
+Building an yaml airflow image:
+    docker compose -f airflow.yaml build
+
+Initialie Airflow  database:
+    docker compose -f airflow.yaml up airflow-init
+
+Creating an password file:
+    htpasswd -B -C 10 password.db <your username>
+
+Generating java KeyStore:
+    keytool -genkeypair \\
+  -alias trino \\
+  -keyalg RSA \\
+  -keystore keystore.jks \\
+  -storepass trino123 \\
+  -keypass trino123 \\
+  -dname "CN=localhost, OU=Test, O=Test, L=City, S=State, C=US"
